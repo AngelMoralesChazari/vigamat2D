@@ -89,7 +89,7 @@ export function Login() {
                   </g>
                 </svg>
               )}
-              {loading ? 'Accediendo...' : 'Iniciar Sesión con Google'}
+              {loading ? 'Accediendo...' : 'Iniciar Sesión'}
             </button>
           </div>
 
