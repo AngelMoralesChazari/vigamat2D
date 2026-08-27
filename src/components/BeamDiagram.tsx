@@ -133,7 +133,7 @@ export function BeamDiagram({ model, scale = 55, heightClass = 'h-72 sm:h-80' }:
 
   const maxX = Math.max(...positions.values(), 320) + margin
   const y = 108
-  const viewHeight = 200
+  const viewHeight = 225
   const restrainedCount = model.nodes.filter((node) => node.restrained).length
 
   return (
@@ -251,8 +251,61 @@ export function BeamDiagram({ model, scale = 55, heightClass = 'h-72 sm:h-80' }:
 
                   const px = x1 + (load.position ?? element.L / 2) * scale
                   const top = y - 46 - offset
+                  const distVal = load.position ?? element.L / 2
+                  const distMid = x1 + (distVal * scale) / 2
+                  const distY = y + 42
+
                   return (
                     <g key={load.id}>
+                      {/* Línea punteada de distancia desde el nodo inicial del tramo hasta la carga */}
+                      {distVal > 0 && (
+                        <g>
+                          <line
+                            x1={x1}
+                            y1={distY}
+                            x2={px}
+                            y2={distY}
+                            stroke="#7b8c9d"
+                            strokeWidth="1"
+                            strokeDasharray="3 3"
+                          />
+                          <line
+                            x1={x1}
+                            y1={distY - 4}
+                            x2={x1}
+                            y2={distY + 4}
+                            stroke="#7b8c9d"
+                            strokeWidth="1"
+                          />
+                          <line
+                            x1={px}
+                            y1={distY - 4}
+                            x2={px}
+                            y2={distY + 4}
+                            stroke="#7b8c9d"
+                            strokeWidth="1"
+                          />
+                          <rect
+                            x={distMid - 16}
+                            y={distY - 7}
+                            width="32"
+                            height="14"
+                            fill="#fbfcfe"
+                            rx="2"
+                          />
+                          <text
+                            x={distMid}
+                            y={distY + 3.5}
+                            textAnchor="middle"
+                            fill="#5a6a7e"
+                            fontSize="10"
+                            fontWeight="bold"
+                          >
+                            {distVal} m
+                          </text>
+                        </g>
+                      )}
+
                       <line x1={px} y1={top} x2={px} y2={y - 10} stroke={NAVY_LIGHT} strokeWidth="2.5" />
                       <polygon points={`${px},${y - 4} ${px - 5},${y - 14} ${px + 5},${y - 14}`} fill={NAVY_LIGHT} />
                       <text x={px} y={top - 8} textAnchor="middle" fill={NAVY_LIGHT} fontSize="12" fontWeight="600">

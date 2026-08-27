@@ -14,11 +14,11 @@ export interface ReportAuthor {
 }
 
 export const PROFESSIONAL_TITLES: { value: ProfessionalTitle; label: string }[] = [
-  { value: 'Ing.', label: 'Ingeniero / Ingeniera (Ing.)' },
-  { value: 'Arq.', label: 'Arquitecto / Arquitecta (Arq.)' },
-  { value: 'Mtro.', label: 'Maestro / Maestra (Mtro.)' },
   { value: 'Dr.', label: 'Doctor / Doctora (Dr.)' },
+  { value: 'Mtro.', label: 'Maestro / Maestra (Mtro.)' },
+  { value: 'Ing.', label: 'Ingeniero / Ingeniera (Ing.)' },
   { value: 'Lic.', label: 'Licenciado / Licenciada (Lic.)' },
+  { value: 'Arq.', label: 'Arquitecto / Arquitecta (Arq.)' },
   { value: 'Téc.', label: 'Técnico / Técnica (Téc.)' },
   { value: 'Otro', label: 'Otro' },
 ]

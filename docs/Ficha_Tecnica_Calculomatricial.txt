@@ -1,0 +1,377 @@
+================================================================================
+                    FICHA TÉCNICA — CALCULOMATRICIAL
+         Plataforma web de análisis estructural por método de rigidez
+================================================================================
+
+Producto:          Calculomatricial
+Categoría:         Software de ingeniería civil / análisis estructural
+Tipo:              Aplicación web (SPA) — cálculo en el navegador
+Usuarios:          Estudiantes, docentes e ingenieros civiles
+Idioma de la UI:   Español
+Despliegue:        Nube (estático) — acceso desde cualquier dispositivo
+
+
+--------------------------------------------------------------------------------
+1. DESCRIPCIÓN GENERAL
+--------------------------------------------------------------------------------
+
+Calculomatricial es una plataforma web profesional y didáctica para el análisis
+de vigas mediante el método de rigidez matricial (cálculo matricial).
+
+Permite idealizar la estructura, introducir geometría, propiedades y cargas,
+ejecutar el análisis completo en el cliente y visualizar el procedimiento
+paso a paso con notación matemática. Además genera informes PDF firmados por
+el profesional, listos para entregar o archivar.
+
+Todo el cálculo se realiza en el navegador: no requiere instalación, ni servidor
+de cómputo, ni base de datos para operar.
+
+
+--------------------------------------------------------------------------------
+2. ALCANCE DEL ANÁLISIS — VIGAS
+--------------------------------------------------------------------------------
+
+El núcleo de cálculo resuelve vigas (simples, continuas e hiperestáticas) bajo
+el modelo de Euler-Bernoulli, con un grado de libertad rotacional (θ) por nodo.
+
+2.1 Idealización estructural
+    - Nodos con etiqueta y condición de apoyo (libre o empotrado a rotación θ=0)
+    - Elementos tipo viga definidos por nodos extremos i–j
+    - Propiedades mecánicas por elemento: E (módulo de elasticidad), I (inercia)
+      y L (longitud)
+    - Conectividad arbitraria entre nodos (vigas de uno o varios vanos)
+
+2.2 Cargas admitidas
+    - Carga distribuida uniforme (UDL) sobre el elemento [kN/m]
+    - Carga puntual sobre el elemento, con posición a lo largo del tramo [kN]
+    - Momentos nodales aplicados directamente en los nudos [kN·m]
+
+2.3 Resultados que entrega el motor
+    - Matrices de rigidez locales de cada elemento (ki)
+    - Momentos de empotramiento perfecto (Fki)
+    - Vector de carga del sistema (Fk) y partición sobre G.L. libres (Fd)
+    - Matriz de rigidez global ensamblada (KTG)
+    - Submatriz de G.L. libres (K₁₁) y su inversa (K₁₁⁻¹)
+    - Submatrices de acoplamiento (Krd) para reacciones
+    - Desplazamientos / giros de nodos libres (D) [rad]
+    - Fuerzas internas por elemento: momentos Mi, Mj [kN·m] y cortante V [kN]
+    - Reacciones en apoyos restringidos (FR) [kN·m]
+
+2.4 Modelo matemático
+    Rigidez local de cada viga:
+        ki = (EI / L) · [[4, 2], [2, 4]]
+
+    Empotramiento perfecto (ejemplos):
+        UDL:     Mi = −Mj = w·L² / 12
+        Puntual: fórmulas clásicas de Mi y Mj según posición a en el tramo
+
+    Sistema global:
+        F = K · D
+        D  = K₁₁⁻¹ · Fd          (solo G.L. libres)
+        Fi = ki · Di + Fki       (fuerzas internas por elemento)
+        FR = Krd · Dd + Frd      (reacciones)
+
+
+--------------------------------------------------------------------------------
+3. PROCEDIMIENTO PASO A PASO (7 ETAPAS)
+--------------------------------------------------------------------------------
+
+La plataforma muestra el análisis completo en siete pasos, alineados con el
+procedimiento académico y profesional del método de rigidez:
+
+  Paso 1 — Definición de datos de entrada
+           Geometría, propiedades E/I/L, conectividad, grados de libertad
+           y cargas. Validación automática de la entrada.
+
+  Paso 2 — Matrices de rigidez locales (ki)
+           Una matriz 2×2 por elemento, mapeada a los G.L. globales de sus
+           nodos extremos, visualizada con notación matemática.
+
+  Paso 3 — Momentos de empotramiento perfecto (Fki)
+           Vectores de fuerzas fijas por cargas en barra, con etiquetas de
+           grados de libertad.
+
+  Paso 4 — Vector de carga del sistema (Fk)
+           Fk = cargas nodales − Fki. Partición Fd sobre G.L. libres.
+
+  Paso 5 — Ensamble de la matriz de rigidez (KTG / K₁₁) e inversa
+           Superposición de rigideces locales en la matriz global N×N,
+           extracción de K₁₁ e inversión numérica.
+
+  Paso 6 — Solución de desplazamientos y giros
+           D = K₁₁⁻¹ · Fd. Rotaciones de nodos libres en radianes.
+
+  Paso 7 — Fuerzas internas y reacciones
+           Fi = ki·Di + Fki por elemento; FR = Krd·Dd + Frd en apoyos.
+           Resumen tabular de Mi, Mj y V.
+
+
+--------------------------------------------------------------------------------
+4. MÓDULOS DEL SISTEMA
+--------------------------------------------------------------------------------
+
+La arquitectura separa claramente cálculo, tipos e interfaz.
+
+4.1 Módulo de interfaz (src/components/)
+    Propósito: capturar datos, mostrar la idealización y presentar resultados.
+
+    - AppHeader .......... Cabecera, carga de ejemplos y acción de calcular
+    - BeamDiagram ........ Idealización gráfica SVG (nodos, apoyos, cargas,
+                           cotas y etiquetas) — protagonista visual de la UI
+    - StructureInput ..... Formularios de nodos, elementos, cargas y momentos
+    - ElementLoadRow ..... Fila editable de carga en elemento (UDL / puntual)
+    - UnitsPanel ......... Panel de unidades del sistema
+    - AnalysisSteps ...... Visualización de los 7 pasos del análisis
+    - MatrixDisplay ...... Matrices y vectores en notación matemática
+                           (corchetes, etiquetas θ, resaltado)
+    - DownloadReport ..... Formulario de autor y descarga del informe PDF
+    - Cards / UI ......... Piezas visuales reutilizables (pestañas, resúmenes)
+
+4.2 Módulo de análisis estructural (src/lib/analysis/)
+    Propósito: orquestar el método de rigidez de extremo a extremo.
+
+    - validateStructure .. Valida el modelo (mínimos, propiedades positivas,
+                           conectividad, posición de cargas, G.L. libres)
+    - analyzeStructure ... Ensambla KTG, particiona, resuelve D, calcula
+                           reacciones y fuerzas internas
+
+    Entrada pública unificada: src/lib/structuralAnalysis.ts
+
+4.3 Módulo de rigidez y FEMP (src/lib/stiffness/)
+    Propósito: fórmulas de ingeniería del elemento.
+
+    - elementStiffnessMatrix(E, I, L)
+          Construye ki = (EI/L)·[[4,2],[2,4]]
+    - fixedEndMoments / computeElementFixedEndForces
+          Calcula momentos de empotramiento perfecto para UDL y carga puntual
+
+4.4 Módulo de álgebra matricial (src/lib/matrix/)
+    Propósito: operaciones numéricas puras, sin React ni dominio estructural.
+
+    - Creación y clonado de matrices
+    - Suma, multiplicación matriz–matriz y matriz–vector
+    - Transpuesta y extracción de submatrices
+    - Inversión por eliminación de Gauss–Jordan con pivoteo
+    - Formato numérico profesional (decimales controlados)
+
+4.5 Módulo de informes PDF (src/lib/pdf/)
+    Propósito: generar el documento profesional de entrega.
+
+    - generateAnalysisPdf(model, result, author)
+          Informe A4 con portada, tablas de entrada, matrices en notación
+          matemática, vectores, fuerzas internas, reacciones y pie de página
+          con autor y numeración
+
+4.6 Módulo de tipos (src/types/)
+    Propósito: contratos TypeScript estables entre UI y motor.
+
+    - model.ts ..... StructureModel, nodos, elementos, cargas
+    - results.ts ... AnalysisResult (matrices, D, FR, fuerzas)
+    - report.ts .... Autor del informe (nombre, cargo, carrera)
+    - structure.ts . Barrel de reexportación
+
+4.7 Módulo de datos (src/data/)
+    Propósito: contenido estático y ejemplos didácticos.
+
+    - analysisSteps.ts ...... Textos de los 7 pasos
+    - units.ts .............. Unidades canónicas del sistema
+    - defaultExample.ts ..... Ejemplo de viga de 2 vanos
+    - continuousExample.ts .. Ejemplo de viga continua de 3 vanos
+
+
+--------------------------------------------------------------------------------
+5. INTERFAZ DE USUARIO
+--------------------------------------------------------------------------------
+
+5.1 Diseño
+    - Identidad visual profesional: azul marino (#0a2540) y blanco
+    - Sin degradados; tipografía clara y legible
+    - Responsive: usable en escritorio y dispositivos móviles
+    - Idealización de la estructura como elemento protagonista
+
+5.2 Flujo de trabajo
+    1. Cargar un ejemplo o definir nodos / elementos / cargas manualmente
+    2. Revisar la idealización en el diagrama SVG
+    3. Ejecutar el análisis (validación + cálculo)
+    4. Explorar los 7 pasos con matrices en notación matemática
+    5. Descargar el informe PDF con datos del profesional
+
+5.3 Experiencia didáctica
+    - Cada paso explica qué se obtuvo y para qué sirve
+    - Las matrices se muestran como en un apunte o libro de texto
+      (nombre = [ … ], etiquetas de G.L., valores alineados)
+    - Mensajes de error de validación en español, accionables
+
+
+--------------------------------------------------------------------------------
+6. INFORMES PDF — QUÉ GENERA Y QUÉ INFORMACIÓN CONTIENE
+--------------------------------------------------------------------------------
+
+6.1 Generación
+    Desde la pestaña de resultados, la sección «Descargar cálculos» solicita:
+
+    - Nombre del profesional
+    - Cargo / título (Ing., Arq., Mtro., Dr., Lic., Téc., Otro)
+    - Carrera (p. ej. Ingeniería Civil Constructora)
+
+    Con esos datos genera y descarga un PDF A4 nombrado automáticamente:
+        Analisis_Rigidez_<Nombre>_<YYYY-MM-DD>.pdf
+
+6.2 Contenido del informe
+    Encabezado institucional
+        Título del análisis, modelo (viga Euler-Bernoulli, G.L. θ), fecha
+        y línea de autor (cargo, nombre y carrera).
+
+    Unidades del sistema
+        E [MPa], I [m⁴], L [m], M [kN·m], V [kN], θ [rad], w [kN/m], P [kN].
+
+    1. Datos de entrada
+        - Tabla de nodos (ID, etiqueta, apoyo, G.L.)
+        - Tabla de elementos (Ni, Nj, E, I, L)
+        - Tabla de cargas en elementos (tipo, valor, posición)
+        - Tabla de momentos nodales
+
+    2. Matrices de rigidez locales
+        ki de cada elemento con etiquetas θ y nota EI/L.
+
+    3. Fuerzas de empotramiento
+        Vectores Fki⁽ⁿ⁾ por elemento [kN·m].
+
+    4. Vector de carga
+        Fk completo y Fd (G.L. libres).
+
+    5. Ensamble
+        KTG, K₁₁, K₁₁⁻¹ y Krd (si aplica), en notación matricial.
+
+    6. Desplazamientos
+        Vector D de giros libres [rad].
+
+    7. Fuerzas internas y reacciones
+        Vectores Fi por elemento, tabla resumen Mi / Mj / V,
+        y vector de reacciones FR.
+
+    Pie de página
+        Autor en cada hoja y numeración p. i/n.
+
+6.3 Estilo del informe
+    Orientado a quien ya conoce el método: datos y resultados, sin texto
+    tutorial innecesario. Matrices con tipografía serif/itálica, corchetes
+    delgados y etiquetas de grados de libertad.
+
+
+--------------------------------------------------------------------------------
+7. SISTEMA DE UNIDADES
+--------------------------------------------------------------------------------
+
+| Magnitud                         | Unidad  |
+|----------------------------------|---------|
+| Módulo de elasticidad (E)        | MPa     |
+| Momento de inercia (I)           | m⁴      |
+| Longitud (L)                     | m       |
+| Carga distribuida (w)            | kN/m    |
+| Carga puntual (P)                | kN      |
+| Momentos / reacciones (M, FR)    | kN·m    |
+| Cortante (V)                     | kN      |
+| Rotaciones (θ, D)                | rad     |
+
+El panel de unidades y el informe PDF mantienen la misma convención.
+
+
+--------------------------------------------------------------------------------
+8. VALIDACIÓN Y ROBUSTEZ
+--------------------------------------------------------------------------------
+
+Antes de calcular, el sistema verifica:
+
+    - Mínimo 2 nodos y 1 elemento
+    - Al menos un grado de libertad libre (estructura resoluble)
+    - E > 0, I > 0, L > 0
+    - Nodos extremos distintos en cada elemento
+    - Posición de carga puntual estrictamente dentro del tramo (0, L)
+    - Detección de singularidad numérica al invertir K₁₁
+      (estructura mal condicionada o mecanismo)
+
+Los mensajes de error se muestran en español para corregir la entrada de inmediato.
+
+
+--------------------------------------------------------------------------------
+9. EJEMPLOS PRECARGADOS
+--------------------------------------------------------------------------------
+
+La plataforma incluye ejemplos listos para cargar y calcular:
+
+    - Viga de dos vanos (caso base didáctico)
+    - Viga continua de tres vanos (caso hiperestático)
+
+Permiten demostrar el flujo completo (entrada → 7 pasos → PDF) sin capturar
+datos desde cero.
+
+
+--------------------------------------------------------------------------------
+10. TECNOLOGÍAS Y DESPLIEGUE
+--------------------------------------------------------------------------------
+
+| Capa              | Tecnología                         |
+|-------------------|------------------------------------|
+| Interfaz          | React 19 + TypeScript              |
+| Empaquetado       | Vite 8                             |
+| Estilos           | Tailwind CSS 4                     |
+| Lint              | oxlint                             |
+| Informes PDF      | jsPDF (carga diferida)             |
+| Cálculo           | 100 % en el cliente (sin backend)  |
+| Despliegue        | Vercel (SPA estática)              |
+
+Comandos principales:
+    npm install
+    npm run dev       → desarrollo local
+    npm run build     → producción (tsc + vite)
+    npm run preview   → previsualizar el build
+
+
+--------------------------------------------------------------------------------
+11. CAPACIDADES DE LA PLATAFORMA (RESUMEN EJECUTIVO)
+--------------------------------------------------------------------------------
+
+Calculomatricial:
+
+  ✓ Idealiza vigas con nodos, apoyos y elementos (E, I, L)
+  ✓ Admite cargas distribuidas, puntuales y momentos nodales
+  ✓ Calcula matrices locales, FEMP, ensamble global e inversa
+  ✓ Resuelve giros, reacciones y fuerzas internas (Mi, Mj, V)
+  ✓ Presenta el método en 7 pasos con notación matemática
+  ✓ Visualiza la estructura con diagrama interactivo SVG
+  ✓ Valida la entrada y reporta errores claros en español
+  ✓ Ofrece ejemplos didácticos de vigas continuas
+  ✓ Genera informes PDF profesionales con autor, cargo y carrera
+  ✓ Incluye en el PDF datos de entrada y todos los resultados
+    matriciales del análisis
+  ✓ Opera en el navegador, sin instalación ni servidor de cálculo
+  ✓ Se despliega en la nube y es accesible desde cualquier equipo
+  ✓ Mantiene unidades consistentes en UI e informe
+  ✓ Presenta resultados con formato listo para uso académico
+    y profesional
+
+
+--------------------------------------------------------------------------------
+12. PARA QUIÉN ESTÁ PENSADA
+--------------------------------------------------------------------------------
+
+    - Estudiantes de ingeniería civil que aprenden el método de rigidez
+    - Docentes que necesitan demostrar el procedimiento paso a paso
+    - Profesionales que requieren un cálculo transparente y un PDF
+      firmable para bitácora, práctica o entrega
+
+
+--------------------------------------------------------------------------------
+13. IDENTIDAD DEL PRODUCTO
+--------------------------------------------------------------------------------
+
+Nombre:     Calculomatricial
+Enfoque:    Análisis de vigas por método de rigidez matricial
+Promesa:    Calcular, entender y documentar — en una sola herramienta web
+Estética:   Profesional (navy / blanco), clara y sin ruido visual
+
+
+================================================================================
+                         Fin de la ficha técnica
+================================================================================

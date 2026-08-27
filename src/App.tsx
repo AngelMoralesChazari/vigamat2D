@@ -1,4 +1,9 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect } from 'react'
+import { onAuthStateChanged, signOut } from 'firebase/auth'
+import type { User } from 'firebase/auth'
+import { auth } from './lib/firebase'
+import { Login } from './components/Login'
+import { SavedBeams } from './components/SavedBeams'
 import { AnalysisSteps } from './components/AnalysisSteps'
 import { AppHeader } from './components/AppHeader'
 import { BeamDiagram } from './components/BeamDiagram'
@@ -9,14 +14,35 @@ import { SummaryCard } from './components/ui/Cards'
 import { continuousBeamExample, defaultStructure, oneSpanExample } from './data/examples'
 import { analyzeStructure, validateStructure } from './lib/structuralAnalysis'
 import type { AnalysisResult, StructureModel } from './types/structure'
+import { setForceUnit } from './data/units'
 
 type Tab = 'input' | 'results'
 
 function App() {
+  const [user, setUser] = useState<User | null>(null)
+  const [loadingAuth, setLoadingAuth] = useState(true)
+  
   const [model, setModel] = useState<StructureModel>(defaultStructure)
+  const [forceUnit, setForceUnitState] = useState<'kN' | 't'>('kN')
+  
   const [activeTab, setActiveTab] = useState<Tab>('input')
   const [error, setError] = useState<string | null>(null)
   const [result, setResult] = useState<AnalysisResult | null>(null)
+
+  // Escuchar estado de autenticación de Firebase
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      // Doble validación del correo por seguridad en el cliente
+      if (currentUser && currentUser.email && !currentUser.email.toLowerCase().endsWith('@uagro.mx')) {
+        signOut(auth)
+        setUser(null)
+      } else {
+        setUser(currentUser)
+      }
+      setLoadingAuth(false)
+    })
+    return () => unsubscribe()
+  }, [])
 
   const validationError = useMemo(() => validateStructure(model), [model])
 
@@ -46,9 +72,41 @@ function App() {
     setActiveTab('input')
   }
 
+  const loadSavedBeam = (savedModel: StructureModel) => {
+    setModel(savedModel)
+    setError(null)
+    setResult(null)
+    setActiveTab('input')
+  }
+
+  const handleSignOut = async () => {
+    try {
+      await signOut(auth)
+    } catch (err) {
+      console.error('Error al cerrar sesión:', err)
+    }
+  }
+
+  // Pantalla de carga mientras se verifica la sesión
+  if (loadingAuth) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center bg-slate-900 text-white">
+        <div className="h-12 w-12 animate-spin rounded-full border-4 border-blue-500 border-t-transparent"></div>
+        <p className="mt-4 text-sm font-medium text-slate-300">Cargando VIGMAT 2D...</p>
+      </div>
+    )
+  }
+
+  // Si no está autenticado, mostrar pantalla de inicio de sesión
+  if (!user) {
+    return <Login />
+  }
+
   return (
     <div className="min-h-screen bg-[#f4f6f9] text-[#0a2540]">
       <AppHeader
+        userEmail={user.email}
+        onSignOut={handleSignOut}
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         hasResult={!!result}
@@ -75,13 +133,24 @@ function App() {
 
         {activeTab === 'input' ? (
           <div className="grid gap-6 lg:grid-cols-12 items-start">
-            {/* Lado Izquierdo: Formularios de Edición */}
+            {/* Lado Izquierdo: Formularios de Edición e Integración de Vigas Guardadas */}
             <div className="lg:col-span-4 order-2 lg:order-1 space-y-5">
               <StructureInput model={model} onChange={setModel} />
-              <UnitsPanel />
+              
+              <UnitsPanel forceUnit={forceUnit} onForceUnitChange={(u) => {
+                setForceUnit(u)
+                setForceUnitState(u)
+              }} />
+
+              {/* Panel de vigas guardadas en la base de datos */}
+              <SavedBeams 
+                user={user} 
+                currentStructure={model} 
+                onLoadBeam={loadSavedBeam} 
+              />
             </div>
 
-            {/* Lado Derecho: Diagrama de la Viga (Fijo al hacer scroll) */}
+            {/* Lado Derecho: Diagrama de la Viga */}
             <div className="lg:col-span-8 order-1 lg:order-2 lg:sticky lg:top-5">
               <BeamDiagram model={model} />
             </div>
@@ -93,7 +162,7 @@ function App() {
               <div>
                 <h2 className="text-xl font-bold text-[#0a2540]">Resultados del Análisis</h2>
                 <p className="mt-0.5 text-xs text-[#5a6a7e]">
-                  Viga resuelta mediante el método de rigidez matricial. 7 pasos de cálculo.
+                  Viga resuelta mediante el método de rigidez matricial.
                 </p>
               </div>
               <DownloadReport model={model} result={result} />
@@ -118,7 +187,7 @@ function App() {
           </div>
         ) : (
           <div className="rounded-lg border border-dashed border-[#d0d7e2] bg-white p-12 text-center text-[#5a6a7e]">
-            Define la estructura y presiona <strong className="text-[#0a2540]">Calcular</strong> para ver los 7 pasos del análisis.
+            Define la estructura y presiona <strong className="text-[#0a2540]">Calcular</strong> para ver los pasos del análisis.
           </div>
         )}
       </main>
@@ -127,3 +196,4 @@ function App() {
 }
 
 export default App
+
