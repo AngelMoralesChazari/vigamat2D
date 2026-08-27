@@ -19,7 +19,7 @@ export function Login() {
       
       // Validar dominio del correo de Google
       if (user.email && !validateEmail(user.email)) {
-        setError('Acceso denegado: Tu cuenta de Google no pertenece al dominio @uagro.mx')
+        setError('Acceso denegado: Debes iniciar sesión con tu correo institucional @uagro.mx.')
         await signOut(auth)
       }
     } catch (err: any) {
